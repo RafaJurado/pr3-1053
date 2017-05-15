@@ -1,5 +1,5 @@
 const Twitter = require('twitter');
-const myCreds = require('./credentials/my-credential.json');
+//const myCreds = require('./credentials/my-credential.json');
 const DataSet = require('./myStorage.js');
 
 
