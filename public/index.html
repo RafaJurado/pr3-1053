@@ -57,7 +57,7 @@
 	<script>
 
 	   $(document).ready(function(){
-			 var url = "http://localhost:8000/stream";
+			 var url = "/stream";
 			 $("#streamlist").append("<button id='NEW' class='btn btn-default'>+</button>");
 			 $.getJSON(url).done(function(data){
 				 $.each(data.result,function(indx,value){ addButton(value[0]+":"+value[1]) });
@@ -103,7 +103,7 @@
 		//hay que hacer split porque data es el texto del boton y solo queremos
 		//el nombre del stream, previo a :
 		var streamname=data.getAttribute("id").split(":")[0];
-		var url = "http://localhost:8000/stream/"+streamname+"/words?top=20";
+		var url = "/stream/"+streamname+"/words?top=20";
 
 		$.getJSON(url).done(function(data){
 			update_cloud(data.result);
@@ -111,7 +111,7 @@
 
 
 		// Obtener polaridades
-		var urlPol = "http://localhost:8000/stream/"+streamname+"/polaridad";
+		var urlPol = "/stream/"+streamname+"/polaridad";
 		$.getJSON(urlPol).done(function(data){
 			var cosa = data.result;
 
@@ -129,7 +129,7 @@
 
 		// Obtener los ultimos cinco tuits del stream seleccionado
 		// primero conseguimos los id de los ultimos 5 tuits
-		var urlLast = "http://localhost:8000/stream/"+streamname+"/id?n=5";
+		var urlLast = "/stream/"+streamname+"/id?n=5";
 
 		$.getJSON( urlLast, {format: "json"}).done(function(data){
 			 var last = data.result;
@@ -147,7 +147,7 @@
 
 
 		// Obtener geolocalizacion
-		var urlGeo = "http://localhost:8000/stream/"+streamname+"/geo";
+		var urlGeo = "/stream/"+streamname+"/geo";
 		$.getJSON( urlGeo, {format: "json"}).done(function(data){
 			//listCoords contiene una lista con formato tuit#: [x,y]
 			 update_map(data.result);
@@ -166,7 +166,7 @@
 		var postdata={name : $("#name").val(), track : $("#track").val()};
 		//esto envia al api res en myServer
 		$.ajax({  type: "POST",
-		               url: "http://localhost:8000/stream/",
+		               url: "/stream/",
 		               data: JSON.stringify(postdata),
 		               success: function(data){
 		                   if (data.error!=null) {alert("Error:"+data.error);}
