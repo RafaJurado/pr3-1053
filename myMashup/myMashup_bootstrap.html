@@ -1,0 +1,312 @@
+<html lang="es" >
+<head>
+	<meta charset="utf-8">
+	<title>Práctica 1: Mash-up de servicios</title>
+	<style>
+		div#streamlist{
+			width:100%;
+			background-color:purple;
+		}
+
+		div#form-container{
+			width:70%;
+		    visibility:hidden;
+		}
+
+		canvas#wordcloud{
+		    width:250px;
+		    height:250px;
+
+		}
+
+		canvas#polarity{
+		    width:250px;
+		    height:250px;
+
+		}
+
+		div#mapcanvas{
+		    width:250px;
+		    height:250px;
+
+		}
+
+		div#fotos{
+		    background-color:purple;
+		}
+
+		.my-img{
+			height: 250px;
+			width:  250px;
+		}
+
+	.carousel-inner > .item > img,
+  	.carousel-inner > .item > a > img {
+      width: 40%;
+      margin: auto;
+  	}
+
+	</style>
+
+	<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+	<script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+	<script src="http://timdream.org/wordcloud2.js/src/wordcloud2.js"></script>
+	<script src="http://maps.googleapis.com/maps/api/js?key=AIzaSyD6hLLddlXLuJE52eCmsFbA8OGZ0eh_UO4"></script>
+
+	<script>
+
+	   $(document).ready(function(){
+			 var url = "http://localhost:8000/stream";
+			 $("#streamlist").append("<button id='NEW' class='btn btn-default'>+</button>");
+			 $.getJSON(url).done(function(data){
+				 $.each(data.result,function(indx,value){ addButton(value[0]+":"+value[1]) });
+
+		   });
+       //var streams=["felicidad","euforia"];
+
+
+
+	   //$.each(streams,function(indx,data){ addButton(data) });
+
+	   //event for stream class
+	   $(".stream").click(function(){ actionButton(this) });
+
+	   //event for button "NEW"
+	   $("#NEW").click(function(){
+			//make visible the form
+			$("#form-container").css({"visibility":"visible"});
+			newdata=$("#name").val("");
+	   });
+
+	   $("#create").click(function(){
+	   		$("#form-container").css({"visibility":"hidden"});
+			var newdata=$("#name").val();
+			//create new button for new stream
+			if (newdata.length>0){
+				addButton(newdata);
+				streams.push(newdata);
+			};
+		});
+
+	});
+
+	function addButton(data){
+		if (data.length>0){
+			var newbutton="<button class='btn btn-default stream' style='margin: 5px;' id="+data+">"+data+"</button>";
+			$(newbutton).insertBefore($("#NEW")).click(function(){actionButton(this)});
+		};
+	};
+	//data representa el texto del boton
+	function actionButton(data){
+		//Draw components of the selected stream
+		//hay que hacer split porque data es el texto del boton y solo queremos
+		//el nombre del stream, previo a :
+		var streamname=data.getAttribute("id").split(":")[0];
+		var url = "http://localhost:8000/stream/"+streamname+"/words?top=20";
+
+		$.getJSON(url).done(function(data){
+			update_cloud(data.result);
+		});
+
+
+		// Obtener polaridades
+		var urlPol = "http://localhost:8000/stream/"+streamname+"/polaridad";
+		$.getJSON(urlPol).done(function(data){
+			var cosa = data.result;
+
+			var positive=cosa.positive;
+			//console.log(positive);
+			var negative=cosa.negative;
+			var total= positive+negative;
+			//console.log(total);
+			var pos = positive/total;
+			//console.log(pos);
+			var polarity={"positive":pos,"negative":1-pos};
+			update_polar(polarity);
+		});
+
+
+		// Obtener los ultimos cinco tuits del stream seleccionado
+		// primero conseguimos los id de los ultimos 5 tuits
+		var urlLast = "http://localhost:8000/stream/"+streamname+"/id?n=5";
+
+		$.getJSON( urlLast, {format: "json"}).done(function(data){
+			 var last = data.result;
+			 // ahora tenemos que cambiar el contenido de los campos del html con id t#
+			 // donde # representa el numero
+			 // recorremos last que contiene los id de los tuits
+			 // Se accedera a los tuits de la siguiente forma: Debido a restricciones
+			 // legales, sólo incluiremos enlaces que accedan directamente los tweets con sus
+			 // identificadores únicos.
+			 for(var i=0; i<5; i++){
+				 //http://api.jquery.com/attr/
+	 				$("#t"+i).attr("href", "https://twitter.com/statuses/"+last[i]);
+	 			}
+	 	});
+
+
+		// Obtener geolocalizacion
+		var urlGeo = "http://localhost:8000/stream/"+streamname+"/geo";
+		$.getJSON( urlGeo, {format: "json"}).done(function(data){
+			//listCoords contiene una lista con formato tuit#: [x,y]
+			 update_map(data.result);
+
+	 	});
+
+		//var marklabel=streamname+":tweet1";
+		//var geoPos={marklabel:[40.0-Math.random(),-0.624207+Math.random()/10.]};
+		//update_map(geoPos);
+
+		update_pictures(streamname);
+	};
+
+	function caca(){
+		//mismo nombre de parametros que na la funcion de myserver
+		var postdata={name : $("#name").val(), track : $("#track").val()};
+		//esto envia al api res en myServer
+		$.ajax({  type: "POST",
+		               url: "http://localhost:8000/stream/",
+		               data: JSON.stringify(postdata),
+		               success: function(data){
+		                   if (data.error!=null) {alert("Error:"+data.error);}
+		               },
+		               contentType:'application/json'
+		           });
+	}
+
+	function update_polar(data){
+	    var canvas=document.getElementById("polarity");
+	    var contexto=canvas.getContext("2d");
+
+ 	    //limpia canvas
+	    contexto.clearRect(0, 0, canvas.width, canvas.height);
+
+	    contexto.fillStyle="green";
+	    contexto.lineWidth=2;
+	    contexto.beginPath();
+	    contexto.rect(0,0,canvas.width,canvas.height*data["positive"],true)
+	    contexto.fill();
+
+	    contexto.fillStyle="red";
+	    contexto.lineWidth=2;
+	    contexto.beginPath();
+	    contexto.rect(0,canvas.height*data["positive"],canvas.width,canvas.height,true)
+	    contexto.fill();
+
+	    contexto.font = "20px Courier";
+	    contexto.fillStyle="black";
+	    contexto.fillText("Polaridad",20,20);
+	};
+
+
+	function update_map(data){
+		var mapProp = {
+			center:new google.maps.LatLng(40.0,-0.624207),
+			zoom:7,
+			mapTypeId:google.maps.MapTypeId.ROADMAP
+	  };
+		var map=new google.maps.Map(document.getElementById("mapcanvas"),mapProp);
+
+		$.each(data,function(key,pos){
+			mark=new google.maps.LatLng(pos[0],pos[1]);
+			var marker=new google.maps.Marker({position:mark, title:key});
+			marker.setMap(map);
+		});
+
+		google.maps.event.addDomListener(window, 'load', update_map);
+
+	};
+
+	function update_pictures(labels){
+		var flickerAPI = "http://api.flickr.com/services/feeds/photos_public.gne?jsoncallback=?";
+		$.getJSON( flickerAPI, {
+				tags: labels,
+				tagmode: "any",
+				format: "json"
+		}).done(function(data){
+				//limpia fotos
+				$("#slides").empty();
+				$("#images").empty();
+
+				$.each(data.items, function( i, item ) {
+					if (i==0){
+						$("<li>").attr("data-target","#fotos").attr("data-slide-to",i.toString()).attr("class","active").appendTo("#slides");
+						$("<div>").attr("class","item active").attr("id",i.toString()).appendTo("#images");
+					}
+					else{
+						$("<li>").attr("data-target","#fotos").attr("data-slide-to",i.toString()).appendTo("#slides");
+						$("<div>").attr("class","item").attr("id",i.toString()).appendTo("#images");
+					}
+					$("<img>").attr("src", item.media.m ).attr("class","my-img").appendTo("#"+i.toString());
+				if ( i === 10 ) {return false;}
+				});
+
+				})
+
+	}
+
+	function update_cloud(data){
+	  options= { list : data};
+	  WordCloud(document.getElementById('wordcloud'), options);
+	};
+	</script>
+
+<body>
+	<div class="container">
+		<h1>Mash-up Rafa Jurado</h1>
+		<p>Página de demostración de Mash-up para la práctica 1 (bootstrap + jquery).
+		<!--Hidden form for creating new buttons -->
+		<div id="form-container">
+		        	<label for="name" width="10%">Tema:</name>
+		        	<input id="name" type="text" width="80%" placeholder="nuevo tema..."></input>
+							<label for="track" width="10%">Track:</name>
+		        	<input id="track" type="text" width="80%" placeholder="nuevo track..."></input>
+		        	<button id="create" width="10%" class="btn btn-default" onclick="caca()">Crear</button>
+		</div>
+
+		<div class="row" >
+				<div class="col-sm-12" id="streamlist"/>
+		</div>
+		<div class="row" style="margin-top: 80px;">
+		    <div class="col-sm-4">
+		       <canvas id="wordcloud"></canvas>
+		    </div>
+		    <div class="col-sm-4">
+		       <canvas id="polarity"></canvas>
+            </div>
+		    <div class="col-sm-4">
+				<div id="mapcanvas"></div>
+		    </div>
+
+
+		 <div class="row" id="tweets">
+		 	<div id="tweets" class="col-sm-12" style="padding-top: 15px;">
+				<div class="panel panel-primary">
+					<div class="panel-heading">
+				    <h3 class="panel-title">Últimos Tuits</h3>
+				  </div>
+				  <div class="panel-body">
+		        		<!-- TODO: generate this part dynamically (IDs taken from id_str) -->
+								<a href="#" target="_blank" id="t0">Tuit 1</a>
+		        		<a href="#" target="_blank" id="t1">Tuit 2</a>
+								<a href="#" target="_blank" id="t2">Tuit 3</a>
+		        		<a href="#" target="_blank" id="t3">Tuit 4</a>
+								<a href="#" target="_blank" id="t4">Tuit 5</a>
+		        	</div>
+				  </div>
+			</div>
+
+        </div>
+		 <div class="row">
+		    <div class="col-sm-12">
+				<div id="fotos" class="carousel slide" data-ride="carousel">
+					<ol  id="slides" class="carousel-indicators"></ol>
+					<div id="images" class="carousel-inner" role="listbox"></div>
+				</div>
+				<!--<div id="fotos"></div>-->
+
+		</div>
+	</div>
+</body>
+</html>
